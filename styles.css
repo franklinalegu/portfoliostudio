@@ -193,3 +193,17 @@ table.list tr:hover td { background: #00000008; }
   .doc .sig-meta dt:has(+ dd:empty) { display: none; }
   .doc tr:has(> td:last-child:empty) { display: none; }
 }
+/* Portfolio display: uniform grid, hover lift, full-bleed detail hero */
+.pf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+@media (max-width: 900px) { .pf-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .pf-grid { grid-template-columns: 1fr; } }
+.pf-tile { padding: 0; overflow: hidden; text-align: left; cursor: pointer; }
+.pf-cover { aspect-ratio: 4 / 3; overflow: hidden; background: var(--mist, #f0ede6); }
+.pf-cover img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
+.pf-tile:hover .pf-cover img { transform: scale(1.05); }
+.pf-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+.pf-meta { padding: 14px 16px 16px; }
+.pf-meta h3 { margin: 0 0 4px; font-size: 1rem; }
+.pf-meta p { margin: 0; font-size: .8rem; color: var(--stone); }
+.pf-hero img { width: 100%; max-height: 440px; object-fit: cover; display: block; }
+.pf-prevnext { display: flex; justify-content: space-between; gap: 12px; }

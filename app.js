@@ -15,6 +15,7 @@ const store = {
     try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.items)) this.data = Object.assign(this.data, d); } catch (e) {}
     this.data.settings = Object.assign({ studio: "MrJamesBrand Ltd", email: "hello@mrjamesbrandltd.com", adminUser: "mrjamesbrandltd", lockHash: "" }, this.data.settings);
     if (!Array.isArray(this.data.items)) this.data.items = [];
+    for (const x of this.data.items) if (x.appreciations === undefined) x.appreciations = 0;
   },
   save() { localStorage.setItem(KEY, JSON.stringify(this.data)); }
 };
@@ -26,9 +27,16 @@ let draft = null;
 function blankItem() {
   return { id: uid(), ref: "PRJ-MJB-" + String(Math.floor(1000 + Math.random() * 9000)),
     title: "", client: "", category: "Brand Identity", year: thisYear(), summary: "", description: "",
-    url: "", cover: "", featured: false, status: "DRAFT", createdAt: new Date().toISOString().slice(0, 10) };
+    url: "", cover: "", featured: false, status: "DRAFT", appreciations: 0, createdAt: new Date().toISOString().slice(0, 10) };
 }
 const published = () => S.items.filter((x) => x.status === "PUBLISHED");
+const displayList = (cat) => published().filter((x) => !cat || x.category === cat).sort((a, b) => (b.featured - a.featured) || String(b.year).localeCompare(String(a.year)));
+function pfTile(x) {
+  return `<button class="card pf-tile" data-act="open-display" data-id="${x.id}">
+    <div class="pf-cover">${x.cover ? `<img src="${x.cover}" alt="${esc(x.title)} cover" loading="lazy">` : `<div class="pf-empty">◍</div>`}</div>
+    <div class="pf-meta"><h3>${esc(x.title) || "(untitled)"}</h3>
+    <p>${esc(x.category)} · ${esc(String(x.year))} · ★ ${Number(x.appreciations) || 0}</p></div></button>`;
+}
 
 /* ---------- views ---------- */
 function badge(s) { return `<span class="badge b-${s.toLowerCase()}">${s}</span>`; }
@@ -113,21 +121,22 @@ function vEditor() {
 
 function vDisplay() {
   const cats = ["", ...new Set(published().map((x) => x.category))];
-  const list = published().filter((x) => !route.cat || x.category === route.cat).sort((a, b) => (b.featured - a.featured) || String(b.year).localeCompare(String(a.year)));
+  const list = displayList(route.cat);
   return `<p class="eyebrow">Portfolio Studio</p>
     <h1 class="page-title">Selected <span class="hl">work.</span></h1>
     <div class="toolbar no-print">${cats.map((c) => `<button class="btn ${route.cat === c ? "btn-primary" : "btn-ghost"}" data-act="filter" data-cat="${esc(c)}">${c || "All"}</button>`).join("")}</div>
-    ${list.length ? `<div class="grid3 mt">${list.map((x) => `<button class="card" style="padding:0;overflow:hidden;text-align:left;cursor:pointer" data-act="open-display" data-id="${x.id}">${coverImg(x)}
-      <div style="padding:16px"><p class="eyebrow">${esc(x.category)} · ${esc(String(x.year))}${x.featured ? " · ★" : ""}</p>
-      <h3 class="mt">${esc(x.title)}</h3><p style="font-size:.85rem;color:var(--stone)">${esc(x.client)}</p></div></button>`).join("")}</div>`
+    ${list.length ? `<div class="pf-grid mt">${list.map(pfTile).join("")}</div>`
     : `<div class="card empty mt">Nothing published${route.cat ? " in this category" : ""} yet.</div>`}`;
 }
 
 function vDetail(id) {
   const x = S.items.find((y) => y.id === id);
   if (!x) return `<div class="card empty">Not found.</div>`;
+  const order = displayList("");
+  const at = order.findIndex((y) => y.id === id);
+  const prev = order[at - 1], next = order[at + 1];
+  const related = order.filter((y) => y.id !== id && y.category === x.category).slice(0, 3);
   return `<p class="eyebrow">Work · ${esc(x.ref)} ${badge(x.status)}</p>
-    <h1 class="page-title">${esc(x.title) || "(untitled)"}</h1>
     <div class="toolbar no-print">
       <button class="btn btn-ghost" data-act="back-display">← Display</button>
       <button class="btn btn-ghost" data-act="edit" data-id="${x.id}">Edit</button>
@@ -135,13 +144,22 @@ function vDetail(id) {
       <button class="btn btn-ghost" data-act="feature" data-id="${x.id}">${x.featured ? "Unfeature" : "Feature"}</button>
       <span class="spacer"></span><button class="btn btn-danger" data-act="del" data-id="${x.id}">Delete</button>
     </div>
-    <div class="doc mt"><div class="doc-page">${coverImg(x, 320)}
-      <p class="eyebrow mt">${esc(x.category)} · ${esc(String(x.year))} · ${esc(x.client)}</p>
-      <h2>${esc(x.title) || "(untitled)"}</h2>
-      <p>${esc(x.summary).replace(/\n/g, "<br>")}</p>
-      <p>${esc(x.description).replace(/\n/g, "<br>")}</p>
-      ${x.url ? `<p><a href="${esc(x.url)}" target="_blank" rel="noopener">View live →</a></p>` : ""}
-    </div></div>`;
+    <div class="doc mt"><div class="doc-page" style="padding:0;overflow:hidden">
+      ${x.cover ? `<div class="pf-hero"><img src="${x.cover}" alt="${esc(x.title)} cover"></div>` : ""}
+      <div style="padding:32px">
+      <p class="eyebrow">${esc(x.category)} · ${esc(x.client)} · ${esc(String(x.year))}</p>
+      <h1 style="margin:8px 0 16px">${esc(x.title) || "(untitled)"}</h1>
+      <p style="font-size:1.05rem;line-height:1.7">${esc(x.summary).replace(/\n/g, "<br>")}</p>
+      <p style="line-height:1.7">${esc(x.description).replace(/\n/g, "<br>")}</p>
+      ${x.url ? `<p class="mt"><a href="${esc(x.url)}" target="_blank" rel="noopener">View live →</a></p>` : ""}
+      <p class="mt"><button class="btn ${x.featured ? "btn-lime" : "btn-primary"}" data-act="appreciate" data-id="${x.id}">★ Appreciate · ${Number(x.appreciations) || 0}</button></p>
+      </div>
+    </div></div>
+    <div class="pf-prevnext mt no-print">
+      ${prev ? `<button class="btn btn-ghost" data-act="open-display" data-id="${prev.id}">← ${esc(prev.title) || "Previous"}</button>` : `<span></span>`}
+      ${next ? `<button class="btn btn-ghost" data-act="open-display" data-id="${next.id}">${esc(next.title) || "Next"} →</button>` : `<span></span>`}
+    </div>
+    ${related.length ? `<h3 class="mt" style="margin:24px 0 12px">More ${esc(x.category)}</h3><div class="pf-grid">${related.map(pfTile).join("")}</div>` : ""}`;
 }
 
 function vSettings() {
@@ -297,6 +315,13 @@ document.addEventListener("click", async (e) => {
     else { if (!persistDraft()) return; draft.status = draft.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED"; persistDraft(); route = { view: "detail", id: draft.id }; render(); }
   }
   else if (act === "feature") { const x = S.items.find((y) => y.id === id); if (x) { x.featured = !x.featured; store.save(); render(); } }
+  else if (act === "appreciate") {
+    const x = S.items.find((y) => y.id === id); if (!x) return;
+    if (sessionStorage.getItem("pf-appr-" + id)) { toast("Already appreciated."); return; }
+    x.appreciations = (Number(x.appreciations) || 0) + 1;
+    try { sessionStorage.setItem("pf-appr-" + id, "1"); } catch (e) {}
+    store.save(); render(); toast("★ Appreciated.");
+  }
   else if (act === "del") { const x = S.items.find((y) => y.id === id); if (x && confirm(`Delete "${x.title || x.ref}"?`)) { S.items = S.items.filter((y) => y.id !== id); store.save(); route = { view: "projects", id: null }; render(); toast("Deleted."); } }
   else if (act === "preview-display") { if (persistDraft(true)) { route = { view: "display", id: null }; render(); } }
   else if (act === "open-display") { route = { view: "detail", id }; render(); }
