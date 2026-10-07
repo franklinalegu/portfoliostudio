@@ -15,7 +15,7 @@ const store = {
     try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.items)) this.data = Object.assign(this.data, d); } catch (e) {}
     this.data.settings = Object.assign({ studio: "MrJamesBrand Ltd", email: "hello@mrjamesbrandltd.com", adminUser: "mrjamesbrandltd", lockHash: "" }, this.data.settings);
     if (!Array.isArray(this.data.items)) this.data.items = [];
-    for (const x of this.data.items) if (x.appreciations === undefined) x.appreciations = 0;
+    for (const x of this.data.items) { if (x.appreciations === undefined) x.appreciations = 0; if (!Array.isArray(x.images)) x.images = []; }
   },
   save() { localStorage.setItem(KEY, JSON.stringify(this.data)); }
 };
@@ -27,7 +27,7 @@ let draft = null;
 function blankItem() {
   return { id: uid(), ref: "PRJ-MJB-" + String(Math.floor(1000 + Math.random() * 9000)),
     title: "", client: "", category: "Brand Identity", year: thisYear(), summary: "", description: "",
-    url: "", cover: "", featured: false, status: "DRAFT", appreciations: 0, createdAt: new Date().toISOString().slice(0, 10) };
+    url: "", cover: "", images: [], featured: false, status: "DRAFT", appreciations: 0, createdAt: new Date().toISOString().slice(0, 10) };
 }
 const published = () => S.items.filter((x) => x.status === "PUBLISHED");
 const displayList = (cat) => published().filter((x) => !cat || x.category === cat).sort((a, b) => (b.featured - a.featured) || String(b.year).localeCompare(String(a.year)));
@@ -108,7 +108,11 @@ function vEditor() {
       <h3 class="mt">Cover image</h3>
       ${d.cover ? `<p><img src="${d.cover}" alt="cover" style="max-width:100%;max-height:220px"></p><p class="mt"><button class="btn btn-danger" data-act="cover-clear">Remove cover</button></p>`
         : `<p><button class="btn btn-ghost" data-act="cover-pick">Upload cover</button><input type="file" id="cover-file" accept="image/png,image/jpeg" style="display:none"></p>
-          <p style="font-size:.8rem;color:var(--stone)">PNG or JPG, resized on upload.</p>`}
+          <p style="font-size:.8rem;color:var(--stone)">PNG or JPG, resized on upload. Shows on cards and the grid.</p>`}
+      <h3 class="mt">Project images <span style="font-weight:400;font-size:.8rem;color:var(--stone)">${(d.images || []).length} added, stack on the project page like Behance</span></h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${(d.images || []).map((g, i) => `<div style="position:relative"><img src="${g}" alt="project image ${i + 1}" style="width:110px;height:82px;object-fit:cover;display:block"><button data-act="image-del" data-i="${i}" aria-label="Remove image" style="position:absolute;top:2px;right:2px;min-width:28px;min-height:28px">×</button></div>`).join("")}</div>
+      <p class="mt"><button class="btn btn-ghost" data-act="images-pick">Upload images</button><input type="file" id="images-file" accept="image/png,image/jpeg" multiple style="display:none"></p>
+      <p style="font-size:.8rem;color:var(--stone)">JPG preferred, each resized on upload. Browser storage is limited, so favor a handful of strong shots.</p>
     </div><div id="preview"><div class="doc"><div class="doc-page">${coverImg(d, 260)}
       <p class="eyebrow mt">${esc(d.category)} · ${esc(String(d.year))}</p>
       <h1>${esc(d.title) || "(untitled)"}</h1>
@@ -152,6 +156,7 @@ function vDetail(id) {
       <p style="font-size:1.05rem;line-height:1.7">${esc(x.summary).replace(/\n/g, "<br>")}</p>
       <p style="line-height:1.7">${esc(x.description).replace(/\n/g, "<br>")}</p>
       ${x.url ? `<p class="mt"><a href="${esc(x.url)}" target="_blank" rel="noopener">View live →</a></p>` : ""}
+      ${(x.images || []).map((g, i) => `<p><img src="${g}" alt="${esc(x.title)} image ${i + 1}" loading="lazy" style="width:100%;display:block"></p>`).join("")}
       <p class="mt"><button class="btn ${x.featured ? "btn-lime" : "btn-primary"}" data-act="appreciate" data-id="${x.id}">★ Appreciate · ${Number(x.appreciations) || 0}</button></p>
       </div>
     </div></div>
@@ -329,6 +334,8 @@ document.addEventListener("click", async (e) => {
   else if (act === "filter") { route = { view: "display", id: null, cat: b.dataset.cat || "" }; render(); }
   else if (act === "cover-pick") { const f = $("#cover-file"); if (f) f.click(); }
   else if (act === "cover-clear") { if (draft && confirm("Remove the cover image?")) { draft.cover = ""; render(); } }
+  else if (act === "images-pick") { const f = $("#images-file"); if (f) f.click(); }
+  else if (act === "image-del") { if (draft && draft.images) { draft.images.splice(Number(b.dataset.i), 1); render(); } }
   else if (act === "save-settings") {
     S.settings.studio = $("#set-studio").value; S.settings.email = $("#set-email").value;
     if ($("#set-adminuser")) S.settings.adminUser = $("#set-adminuser").value.trim() || "mrjamesbrandltd";
@@ -383,6 +390,34 @@ document.addEventListener("change", (e) => {
       img.src = rd.result;
     };
     rd.readAsDataURL(f);
+    return;
+  }
+  if (e.target.id === "images-file") {
+    const files = Array.from(e.target.files || []); e.target.value = ""; if (!files.length || !draft) return;
+    if (!draft.images) draft.images = [];
+    let pending = 0, failed = 0;
+    const done = () => { if (--pending === 0) { if (failed) alert(`${failed} image${failed > 1 ? "s" : ""} skipped (over 5MB or unreadable).`); try { persistDraft(true); } catch (_) { alert("Browser storage is full. Remove some images."); } render(); } };
+    for (const f of files) {
+      if (f.size > 5 * 1024 * 1024) { failed++; continue; }
+      pending++;
+      const rd = new FileReader();
+      rd.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 1400, sc = Math.min(1, maxW / img.width);
+          const cv = document.createElement("canvas");
+          cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
+          cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+          draft.images.push(cv.toDataURL("image/jpeg", 0.85));
+          done();
+        };
+        img.onerror = () => { failed++; done(); };
+        img.src = rd.result;
+      };
+      rd.onerror = () => { failed++; done(); };
+      rd.readAsDataURL(f);
+    }
+    if (!pending && failed) alert(`${failed} image${failed > 1 ? "s" : ""} skipped (over 5MB or unreadable).`);
     return;
   }
   if (e.target.id === "restore-file") {

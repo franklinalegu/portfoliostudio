@@ -49,7 +49,8 @@ Finished work scattered across drives, chats, and social posts. No single record
 ### Covers
 
 1. Accept PNG or JPG under 5MB, resized on upload.
-2. Remove and replace at any time.
+2. Accept many project images per project as JPG, stacked full width on the project page.
+3. Remove and replace cover plus images at any time.
 3. Render from stored data only, never from remote URLs.
 
 ### Backup and settings

@@ -15,6 +15,7 @@ Any static server works as well: `python -m http.server 8081` from this folder. 
 * **Editor**: side form plus live preview. Title, client, category, year, link, summary, full story, cover upload, featured flag, status
 * **Display**: public style grid of published work only, filterable by category, featured first, with a full detail view per project
 * **Covers**: PNG or JPG upload, resized on the way in, removable at any time
+* **Project images**: upload many JPG shots per project. They stack full width on the project page like Behance. Favor a handful of strong shots since browser storage is limited
 * **Backup and restore**: the whole studio as one file, plain or password encrypted
 * **Print and PDF**: browser print with a document only stylesheet
 

@@ -9,4 +9,6 @@ assert.ok(/if \(isLocked\(\)\)/.test(src), "all views must sit behind login");
 assert.ok(/PII|retention/i.test(readme), "README needs retention note");
 // behance style: uniform grid, hero detail, appreciate once, prev/next, related
 for (const s of ["pf-grid", "pfTile", "pf-hero", "appreciate", "pf-appr-", "More ${esc(x.category)}"]) assert.ok(src.includes(s), "missing behance: " + s);
+// galleries: many uploads, stacked blocks, JPEG diet, quota guard
+for (const s of ["images-file", "image-del", "Project images", "image/jpeg", "storage is full"]) assert.ok(src.includes(s), "missing gallery: " + s);
 console.log("audit-test: green");
