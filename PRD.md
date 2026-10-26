@@ -4,7 +4,7 @@ Product of MRJAMESBRAND LTD. Companion to Contract Studio, which handles agreeme
 
 ## 1. Product summary
 
-Portfolio Studio is the memory and shop window of the studio. Finished engagements become project records with covers and stories. The best become published and featured, then present themselves on a filterable display. One folder, no build step, no database, no server.
+Portfolio Studio is the memory and shop window of the studio. Finished engagements become project records with covers and stories. The best become published and featured, then present themselves on a filterable display. Project data stays in one folder with no build step and no database; only the studio password gate uses a small server-side database.
 
 ## 2. Problem
 
@@ -15,7 +15,7 @@ Finished work scattered across drives, chats, and social posts. No single record
 1. Every finished engagement becomes a project record in minutes.
 2. Publishing is one tap, and unpublishing never destroys data.
 3. The display reads as a finished portfolio: covers, categories, featured order, full stories.
-4. The same security posture as Contract Studio: first run password, idle lock, throttled login, encrypted backups, hardened rendering.
+4. The same security posture as Contract Studio: online password, idle lock, throttled login, encrypted backups, hardened rendering.
 5. Static deploy with zero maintenance, same as its sibling product.
 
 ## 4. Non goals
@@ -62,9 +62,9 @@ Finished work scattered across drives, chats, and social posts. No single record
 
 ## 7. Security and privacy requirements
 
-1. No credential ships in the product. First run forces a fresh password of 8 characters or more.
-2. Passwords persist as salted SHA 256 hashes only.
-3. Unlock is per tab. Idle ten minutes locks. Five wrong tries trigger a growing wait that survives reloads.
+1. The studio password lives in the online database as a PHP password hash. No plaintext credential ships in the product or the client.
+2. Passwords persist as salted one-way hashes only and are never returned to the browser.
+3. Unlock is per tab. Idle ten minutes locks. Five wrong tries trigger a growing wait enforced by the server that survives reloads and applies across devices.
 4. Every view sits behind login. The page hides from search crawlers.
 5. Client names in records follow the studio retention rule: browser plus backups only, deleted when no longer needed.
 
@@ -91,5 +91,5 @@ Finished work scattered across drives, chats, and social posts. No single record
 ## 11. Rollout and operations
 
 1. Local use runs from `start-server.bat` on port 8081.
-2. Public use deploys from `main` through GitHub Actions to the portfolio subdomain, followed by first run password creation.
+2. Public use deploys from `main` through GitHub Actions to the portfolio subdomain, with the login account seeded in the online database once.
 3. Backup discipline after every publishing session is part of the definition of done.

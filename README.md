@@ -1,12 +1,12 @@
 # Portfolio Studio · MRJAMESBRAND LTD
 
-Finished projects, collected, published, and presented. One folder, no build step, no database, no account. Data stays in the browser on the device that runs it.
+Finished projects, collected, published, and presented. One folder, no build step, no database for project data, no account. Project data stays in the browser on the device that runs it; the studio password is verified by an online database so it works on every device.
 
 ## Run it
 
 Double click **`start-server.bat`**, then open http://127.0.0.1:8081
 
-Any static server works as well: `python -m http.server 8081` from this folder. Use a different port from Contract Studio when both run at once.
+A plain static server (`python -m http.server 8081`) previews the interface, but the login gate needs the PHP/SQLite backend. For a fully working local copy use PHP 8 with `pdo_sqlite`: `php -S 127.0.0.1:8081` and point `PORTFOLIO_DB` at a local SQLite database. Use a different port from Contract Studio when both run at once.
 
 ## What it does
 
@@ -29,16 +29,15 @@ Any static server works as well: `python -m http.server 8081` from this folder. 
 
 ## Security model
 
-* **First run setup.** No password ships with the studio. The first screen forces creation of a username plus password of 8 characters or more, stored only as a salted SHA 256 hash.
-* **Locking.** Unlock lasts for the browser tab only. Ten quiet minutes lock the studio. Five wrong tries trigger a growing wait that survives reloads. The page hides from search crawlers.
+* **Server-side password.** The studio password is provisioned in the online SQLite database as a PHP password hash, never as plain text and never in the client. Every device opens on the login screen; first-run setup is not used once the account exists. Change it any time from Settings.
+* **Locking.** Unlock lasts for the browser tab only. Ten quiet minutes lock the studio. Five wrong tries trigger a growing wait enforced by the server that survives reloads and applies across devices. The page hides from search crawlers.
 * **Encrypted backups.** Recommended for every backup, protected by PBKDF2 plus AES GCM. Plain export asks for explicit confirmation first.
 * **Hardened rendering.** All output is escaped, inline handlers are gone, and a Content Security Policy ships with the page.
 
 ## Data, backup, and retention
 
-* All records live in browser localStorage under one key. There is no server copy.
+* Project data plus covers exist in three places only: this browser, exported backups, and any screenshots or PDFs you make. The password hash and login throttle live in a SQLite database outside the web root. PII such as client names follows the same retention rule as Contract Studio: keep only for the business relationship plus statutory archiving, then delete exports.
 * Recommended routine: encrypted backup after every publishing session. Keep the backup password with whoever must restore the file.
-* Project data plus covers exist in three places only: this browser, exported backups, and any screenshots or PDFs you make. PII such as client names follows the same retention rule as Contract Studio: keep only for the business relationship plus statutory archiving, then delete exports.
 
 ## Deploy with the main website
 
@@ -63,6 +62,7 @@ Set `STUDIO_TOKEN` in the Vercel project, then paste the same value in Studio, S
 |---|---|
 | `index.html` | Shell, sidebar, and mobile nav |
 | `app.js` | The whole studio: store, views, covers, lock, crypto |
+| `api/auth.php` | Server-side login, password change, and throttling |
 | `styles.css` | Brand styling plus print rules |
 | `start-server.bat` | Local server launcher |
 | `btn-test.mjs`, `crud-test.mjs`, `lock-test.mjs`, `audit-test.mjs` | Test suites, run with node |
@@ -78,7 +78,11 @@ node lock-test.mjs
 node audit-test.mjs
 ```
 
-They cover buttons and nav, full CRUD plus category filter plus encrypted backup round trip, lock plus throttle plus auto lock timing, and audit items such as escaping, CSP, login gating, and retention notes.
+They cover buttons and nav, full CRUD plus category filter plus encrypted backup round trip, server-verified lock plus throttle plus auto lock timing, and audit items such as escaping, CSP, login gating, and retention notes.
+
+## Hostinger subdomain
+
+`portfolio.mrjamesbrandltd.com` is served from `~/domains/mrjamesbrandltd.com/public_html/portfolio`. The login endpoint is `api/auth.php`; it needs PHP 8 with `pdo_sqlite` and a database at `~/portfolio-data/studio.sqlite`, outside the web root. Upload the site files plus `api/auth.php` and `api/.htaccess`, then seed the account once with a PHP `password_hash`. The client never receives the hash or the password.
 
 ## Troubleshooting
 
