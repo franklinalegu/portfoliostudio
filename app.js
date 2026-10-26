@@ -497,7 +497,7 @@ const SYNC_TOKEN_KEY = "mjb-portfolio-sync-token";
 const SYNC_SITE_KEY = "mjb-portfolio-site-url";
 const syncToken = () => { try { return localStorage.getItem(SYNC_TOKEN_KEY) || ""; } catch (e) { return ""; } };
 const syncSite = () => { try { return (localStorage.getItem(SYNC_SITE_KEY) || "").replace(/\/+$/, ""); } catch (e) { return ""; } };
-const isMainSite = () => /(^|\.)mrjamesbrandltd\.com$/i.test(location.hostname) || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+const isMainSite = () => /^(www\.)?mrjamesbrandltd\.com$/i.test(location.hostname) || location.hostname === "localhost" || location.hostname === "127.0.0.1";
 const siteReady = () => /^https?:$/.test(location.protocol) && (isMainSite() || !!syncSite());
 let syncing = false, syncTimer = null;
 
