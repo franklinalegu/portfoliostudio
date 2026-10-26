@@ -40,14 +40,22 @@ Any static server works as well: `python -m http.server 8081` from this folder. 
 * Recommended routine: encrypted backup after every publishing session. Keep the backup password with whoever must restore the file.
 * Project data plus covers exist in three places only: this browser, exported backups, and any screenshots or PDFs you make. PII such as client names follows the same retention rule as Contract Studio: keep only for the business relationship plus statutory archiving, then delete exports.
 
-## Deploy on GitHub Pages with a subdomain
+## Deploy with the main website
 
-Push `main`. The `pages.yml` workflow publishes this folder automatically.
+This studio is bundled into the `mrjamesbrand` repo and served from it:
 
-1. Repo, then Settings, then Pages, then Source: **GitHub Actions**.
-2. DNS: `CNAME portfolio` pointing to `<user>.github.io`.
-3. Pages, then Custom domain: `portfolio.mrjamesbrandltd.com`. HTTPS is enforced automatically.
-4. Open the live URL once and create the password on the first run screen, then restore the latest backup to carry data over.
+* `https://mrjamesbrandltd.com/portfolio-studio`
+* `https://portfolio.mrjamesbrandltd.com` (Vercel domain plus a host rewrite)
+
+The bundle lives at `apps/web/public/portfolio-studio`. Never edit it there. Change this repo, then from the `mrjamesbrand` repo root run:
+
+```
+node scripts/sync-portfolio-studio.mjs
+```
+
+Then commit and push. Saving a project syncs it to Sanity through `/api/studio/portfolio`, so published work appears on `mrjamesbrandltd.com/work`.
+
+Set `STUDIO_TOKEN` in the Vercel project, then paste the same value in Studio, Settings, Sync token when opening the subdomain. The admin session cookie is host-only, so the subdomain needs this token. Also set `SANITY_API_WRITE_TOKEN` so the API can upload covers and create projects.
 
 ## Files
 

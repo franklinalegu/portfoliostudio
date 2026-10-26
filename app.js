@@ -175,6 +175,14 @@ function vSettings() {
       <label class="f">Contact email<input id="set-email" value="${esc(s.email)}"></label>
       <label class="f">Admin username<input id="set-adminuser" value="${esc(s.adminUser || "")}" autocomplete="username"></label>
     </div><p class="mt"><button class="btn btn-primary" data-act="save-settings">Save settings</button></p></div>
+    <div class="card no-print mt" style="max-width:640px"><h3>Main website</h3>
+      <p style="font-size:.85rem;color:var(--stone)">Published projects appear on mrjamesbrandltd.com/work. Saving here syncs automatically when this page runs on the main domain and you are signed in there. On a separate subdomain, set the main site URL and a sync token.</p>
+      <label class="f mt">Main site URL<input id="set-siteurl" value="${esc(syncSite())}" placeholder="https://mrjamesbrandltd.com"></label>
+      <label class="f mt">Sync token (optional)<input id="set-synctoken" type="password" autocomplete="off" value="${esc(syncToken())}" placeholder="Paste STUDIO_TOKEN"></label>
+      <p id="sync-state" style="font-size:.85rem;color:var(--stone)">${siteReady() ? "Ready to sync." : "Local only."}</p>
+      <p class="mt"><button class="btn btn-primary" data-act="save-sync">Save sync</button>
+      <button class="btn btn-ghost" data-act="sync-now">Sync now</button>
+      <button class="btn btn-ghost" data-act="pull-site">Pull from site</button></p></div>
     <div class="card no-print mt" style="max-width:640px"><h3>Backup</h3>
       <p style="font-size:.85rem;color:var(--stone)">All projects and settings live in this browser. Encrypted backup is recommended.</p>
       <p class="mt"><button class="btn btn-primary" data-act="backup-enc">Download encrypted backup</button>
@@ -341,6 +349,15 @@ document.addEventListener("click", async (e) => {
     if ($("#set-adminuser")) S.settings.adminUser = $("#set-adminuser").value.trim() || "mrjamesbrandltd";
     store.save(); toast("Settings saved."); render();
   }
+  else if (act === "save-sync") {
+    const v = ($("#set-synctoken") && $("#set-synctoken").value || "").trim();
+    const u = ($("#set-siteurl") && $("#set-siteurl").value || "").trim();
+    if (v) localStorage.setItem(SYNC_TOKEN_KEY, v); else localStorage.removeItem(SYNC_TOKEN_KEY);
+    if (u) localStorage.setItem(SYNC_SITE_KEY, u); else localStorage.removeItem(SYNC_SITE_KEY);
+    toast("Sync settings saved."); render(); syncNow({ toast: true });
+  }
+  else if (act === "sync-now") { syncNow({ toast: true }); }
+  else if (act === "pull-site") { pullFromSite(); }
   else if (act === "backup") {
     if (!confirm("Plain backup contains project data in readable form. Download anyway? (Encrypted backup is recommended.)")) return;
     download(`portfolio-studio-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(store.data, null, 2)); toast("Plain backup downloaded.");
@@ -471,4 +488,85 @@ async function decBackup(pw, env) {
   return new TextDecoder().decode(pt);
 }
 
+/* ---------- main-site sync (same origin) ---------- */
+/* Every save is mirrored to the main website through /api/studio/portfolio.
+   localStorage stays the working cache, so the studio still runs offline and
+   on the old static deployment. A sync token is only needed when the admin
+   session cookie is not available (portfolio subdomain). */
+const SYNC_TOKEN_KEY = "mjb-portfolio-sync-token";
+const SYNC_SITE_KEY = "mjb-portfolio-site-url";
+const syncToken = () => { try { return localStorage.getItem(SYNC_TOKEN_KEY) || ""; } catch (e) { return ""; } };
+const syncSite = () => { try { return (localStorage.getItem(SYNC_SITE_KEY) || "").replace(/\/+$/, ""); } catch (e) { return ""; } };
+const isMainSite = () => /(^|\.)mrjamesbrandltd\.com$/i.test(location.hostname) || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+const siteReady = () => /^https?:$/.test(location.protocol) && (isMainSite() || !!syncSite());
+let syncing = false, syncTimer = null;
+
+function setSyncState(msg) { const el = document.getElementById("sync-state"); if (el) el.textContent = msg; }
+function syncHeaders(extra) {
+  const h = Object.assign({}, extra || {});
+  if (syncToken()) h.Authorization = "Bearer " + syncToken();
+  return h;
+}
+async function siteFetch(path, opts) {
+  const o = Object.assign({ credentials: "include" }, opts || {});
+  o.headers = syncHeaders(o.body ? Object.assign({ "Content-Type": "application/json" }, o.headers || {}) : o.headers);
+  return fetch(syncSite() + path, o);
+}
+async function pushItem(item) {
+  const res = await siteFetch("/api/studio/portfolio", { method: "POST", body: JSON.stringify({ item }) });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || (res.status === 401 || res.status === 403 ? "Sign in to the main site or add a sync token in Settings." : "Sync failed."));
+  return body.data || {};
+}
+async function syncNow(opts) {
+  if (!siteReady() || syncing) return;
+  syncing = true; setSyncState("Syncing...");
+  try {
+    for (const item of S.items.slice()) {
+      const data = await pushItem(item);
+      if (data.cover) item.cover = data.cover;
+      if (Array.isArray(data.images) && data.images.length) item.images = data.images;
+    }
+    const res = await siteFetch("/api/studio/portfolio");
+    if (res.ok) {
+      const remote = (await res.json()).data || [];
+      for (const r of remote) {
+        if (!S.items.some((x) => x.id === r.id)) {
+          await siteFetch("/api/studio/portfolio?id=" + encodeURIComponent(r.id), { method: "DELETE" });
+        }
+      }
+    }
+    localStorage.setItem(KEY, JSON.stringify(S));
+    setSyncState("Synced " + new Date().toLocaleTimeString());
+    if (opts && opts.toast) toast("Published to the main site.");
+  } catch (e) {
+    setSyncState(e.message || "Sync failed.");
+    if (opts && opts.toast) toast(e.message || "Sync failed.");
+  } finally {
+    syncing = false;
+  }
+}
+function scheduleSync() {
+  if (!siteReady()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncNow(), 900);
+}
+async function pullFromSite() {
+  if (!siteReady()) { toast("Local only."); return; }
+  try {
+    const res = await siteFetch("/api/studio/portfolio");
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body?.error?.message || "Sign in to the main site or add a sync token in Settings.");
+    const data = body.data || [];
+    const byId = new Map(S.items.map((x) => [x.id, x]));
+    for (const r of data) byId.set(r.id, Object.assign(byId.get(r.id) || {}, r));
+    S.items = Array.from(byId.values());
+    localStorage.setItem(KEY, JSON.stringify(S));
+    render(); toast("Pulled " + data.length + " project(s) from the main site.");
+  } catch (e) { toast(e.message || "Pull failed."); }
+}
+const _saveLocal = store.save.bind(store);
+store.save = function () { _saveLocal(); scheduleSync(); };
+
 render();
+setSyncState(siteReady() ? "Ready to sync." : "Local only.");
